@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDoS Detection System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #ff6b6b 0%, #ee5a6f 100%);
+            padding: 20px 40px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.warning {
+            background: #fbbf24;
+        }
+
+        .status-indicator.critical {
+            background: #ff6b6b;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: #2d2d44;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: #ff6b6b;
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #4ade80;
+        }
+
+        .stat-card .unit {
+            font-size: 12px;
+            color: #666;
+            margin-left: 5px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .chart-container {
+            background: #2d2d44;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .chart-container h3 {
+            margin-bottom: 15px;
+            color: #e0e0e0;
+            font-size: 16px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #2d2d44;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th {
+            background: #444;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #e0e0e0;
+            border-bottom: 2px solid #ff6b6b;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #444;
+        }
+
+        tr:hover {
+            background: #363650;
+        }
+
+        .severity-critical {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .severity-high {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 30px 0 20px 0;
+            color: #e0e0e0;
+            border-bottom: 2px solid #ff6b6b;
+            padding-bottom: 10px;
+        }
+
+        .table-container {
+            background: #2d2d44;
+            border: 1px solid #444;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+        }
+
+        .empty-state {
+            padding: 40px;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <span class="status-indicator" id="statusIndicator"></span>
+            🛡️ DDoS Detection System
+        </h1>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Requests/sec</h3>
+                <div>
+                    <span class="value" id="rps">0</span>
+                    <span class="unit">req/s</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <h3>Unique IPs</h3>
+                <div>
+                    <span class="value" id="uniqueIPs">0</span>
+                    <span class="unit">IPs</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <h3>Blocked IPs</h3>
+                <div>
+                    <span class="value" id="blockedIPs">0</span>
+                    <span class="unit">IPs</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Packets</h3>
+                <div>
+                    <span class="value" id="totalPackets">0</span>
+                    <span class="unit">packets</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h3>RPS Timeline</h3>
+                <div class="chart-wrapper">
+                    <canvas id="rpsChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>Protocol Distribution</h3>
+                <div class="chart-wrapper">
+                    <canvas id="protocolChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>Top 10 Source IPs</h3>
+                <div class="chart-wrapper">
+                    <canvas id="topIPsChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>Top 10 Destination Ports</h3>
+                <div class="chart-wrapper">
+                    <canvas id="topPortsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">🚨 Recent Alerts</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Severity</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody id="alertsTable">
+                    <tr>
+                        <td colspan="4" class="empty-state">No alerts yet. System monitoring...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section-title">🚫 Blocked IPs</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="blockedIPsTable">
+                    <tr>
+                        <td colspan="2" class="empty-state">No blocked IPs. System secure.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let rpsChart, protocolChart, topIPsChart, topPortsChart;
+        let rpsHistory = [];
+
+        function initCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#e0e0e0' }
+                    }
+                },
+                scales: {
+                    y: {
+                        ticks: { color: '#888' },
+                        grid: { color: '#444' }
+                    },
+                    x: {
+                        ticks: { color: '#888' },
+                        grid: { color: '#444' }
+                    }
+                }
+            };
+
+            rpsChart = new Chart(document.getElementById('rpsChart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Requests/sec',
+                        data: [],
+                        borderColor: '#4ade80',
+                        backgroundColor: 'rgba(74, 222, 128, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: chartOptions
+            });
+
+            protocolChart = new Chart(document.getElementById('protocolChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['TCP', 'UDP', 'ICMP', 'OTHER'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: ['#ff6b6b', '#4ade80', '#fbbf24', '#888']
+                    }]
+                },
+                options: chartOptions
+            });
+
+            topIPsChart = new Chart(document.getElementById('topIPsChart'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Packets',
+                        data: [],
+                        backgroundColor: '#ff6b6b'
+                    }]
+                },
+                options: chartOptions
+            });
+
+            topPortsChart = new Chart(document.getElementById('topPortsChart'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Packets',
+                        data: [],
+                        backgroundColor: '#4ade80'
+                    }]
+                },
+                options: chartOptions
+            });
+        }
+
+        async function updateDashboard() {
+            try {
+                const statsRes = await fetch('/api/stats');
+                const stats = await statsRes.json();
+
+                document.getElementById('rps').textContent = Math.round(stats.rps);
+                document.getElementById('uniqueIPs').textContent = stats.unique_ips;
+                document.getElementById('totalPackets').textContent = stats.total_packets;
+
+                rpsHistory.push(stats.rps);
+                if (rpsHistory.length > 30) rpsHistory.shift();
+
+                rpsChart.data.labels = rpsHistory.map((_, i) => i);
+                rpsChart.data.datasets[0].data = rpsHistory;
+                rpsChart.update();
+
+                const protocols = stats.protocols || {};
+                protocolChart.data.datasets[0].data = [
+                    protocols.TCP || 0,
+                    protocols.UDP || 0,
+                    protocols.ICMP || 0,
+                    protocols.OTHER || 0
+                ];
+                protocolChart.update();
+
+                const topIPs = stats.top_ips || [];
+                topIPsChart.data.labels = topIPs.map(([ip, _]) => ip.substring(0, 12) + '...');
+                topIPsChart.data.datasets[0].data = topIPs.map(([_, count]) => count);
+                topIPsChart.update();
+
+                const topPorts = stats.top_ports || [];
+                topPortsChart.data.labels = topPorts.map(([port, _]) => port);
+                topPortsChart.data.datasets[0].data = topPorts.map(([_, count]) => count);
+                topPortsChart.update();
+
+                const alertsRes = await fetch('/api/alerts');
+                const alertsData = await alertsRes.json();
+                updateAlertsTable(alertsData.alerts);
+
+                const statusRes = await fetch('/api/system-status');
+                const statusData = await statusRes.json();
+                updateStatus(statusData);
+
+                const blockedRes = await fetch('/api/blocked-ips');
+                const blockedData = await blockedRes.json();
+                document.getElementById('blockedIPs').textContent = blockedData.blocked_ips.length;
+            } catch (error) {
+                console.error('Error updating dashboard:', error);
+            }
+        }
+
+        function updateAlertsTable(alerts) {
+            const tbody = document.getElementById('alertsTable');
+            if (alerts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No alerts yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = alerts.reverse().slice(0, 20).map(alert => `
+                <tr>
+                    <td>${new Date(alert.timestamp).toLocaleTimeString()}</td>
+                    <td>${alert.type}</td>
+                    <td class="severity-${alert.severity.toLowerCase()}">${alert.severity}</td>
+                    <td>${alert.message}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updateStatus(status) {
+            const indicator = document.getElementById('statusIndicator');
+            indicator.classList.remove('warning', 'critical');
+            if (status.status === 'ATTACK') {
+                indicator.classList.add('critical');
+            } else if (status.status === 'WARNING') {
+                indicator.classList.add('warning');
+            }
+        }
+
+        window.addEventListener('load', () => {
+            initCharts();
+            updateDashboard();
+            setInterval(updateDashboard, 5000);
+        });
+    </script>
+</body>
+</html>
