@@ -6,7 +6,7 @@ from scapy.all import sniff, IP, TCP, UDP, ICMP
 
 class NetworkSniffer:
     def __init__(self, interface=None, packet_history_size=10000):
-        self.interface = interface or 'Ethernet'
+        self.interface = interface or 'Wi-Fi'
         self.packet_history = deque(maxlen=packet_history_size)
         self.stats = {
             'rps': 0,
