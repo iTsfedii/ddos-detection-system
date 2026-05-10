@@ -220,6 +220,13 @@
                 </div>
             </div>
             <div class="stat-card">
+                <h3>Total Blocked</h3>
+                <div>
+                    <span class="value" id="totalBlocked">0</span>
+                    <span class="unit">attacks</span>
+                </div>
+            </div>
+            <div class="stat-card">
                 <h3>Total Packets</h3>
                 <div>
                     <span class="value" id="totalPackets">0</span>
@@ -253,6 +260,23 @@
                     <canvas id="topPortsChart"></canvas>
                 </div>
             </div>
+        </div>
+
+        <div class="section-title">📊 Attack Metrics</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody id="metricsTable">
+                    <tr>
+                        <td colspan="2" class="empty-state">Loading metrics...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <div class="section-title">🚨 Recent Alerts</div>
@@ -295,6 +319,7 @@
     <script>
         let rpsChart, protocolChart, topIPsChart, topPortsChart;
         let rpsHistory = [];
+        let timeLabels = [];
 
         function initCharts() {
             const chartOptions = {
@@ -317,21 +342,26 @@
                 }
             };
 
+            // RPS Chart
             rpsChart = new Chart(document.getElementById('rpsChart'), {
                 type: 'line',
                 data: {
-                    labels: [],
+                    labels: timeLabels,
                     datasets: [{
                         label: 'Requests/sec',
-                        data: [],
+                        data: rpsHistory,
                         borderColor: '#4ade80',
                         backgroundColor: 'rgba(74, 222, 128, 0.1)',
-                        tension: 0.4
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#4ade80'
                     }]
                 },
                 options: chartOptions
             });
 
+            // Protocol Chart
             protocolChart = new Chart(document.getElementById('protocolChart'), {
                 type: 'doughnut',
                 data: {
@@ -341,9 +371,19 @@
                         backgroundColor: ['#ff6b6b', '#4ade80', '#fbbf24', '#888']
                     }]
                 },
-                options: chartOptions
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        legend: {
+                            ...chartOptions.plugins.legend,
+                            position: 'bottom'
+                        }
+                    }
+                }
             });
 
+            // Top IPs Chart
             topIPsChart = new Chart(document.getElementById('topIPsChart'), {
                 type: 'bar',
                 data: {
@@ -357,6 +397,7 @@
                 options: chartOptions
             });
 
+            // Top Ports Chart
             topPortsChart = new Chart(document.getElementById('topPortsChart'), {
                 type: 'bar',
                 data: {
@@ -369,6 +410,8 @@
                 },
                 options: chartOptions
             });
+
+            console.log('Charts initialized');
         }
 
         async function updateDashboard() {
@@ -376,17 +419,27 @@
                 const statsRes = await fetch('/api/stats');
                 const stats = await statsRes.json();
 
+                // Update stat cards
                 document.getElementById('rps').textContent = Math.round(stats.rps);
                 document.getElementById('uniqueIPs').textContent = stats.unique_ips;
                 document.getElementById('totalPackets').textContent = stats.total_packets;
 
-                rpsHistory.push(stats.rps);
-                if (rpsHistory.length > 30) rpsHistory.shift();
+                // Update RPS history
+                rpsHistory.push(Math.round(stats.rps * 10) / 10);
+                const now = new Date();
+                timeLabels.push(now.toLocaleTimeString().split(' ')[0]);
+                
+                if (rpsHistory.length > 30) {
+                    rpsHistory.shift();
+                    timeLabels.shift();
+                }
 
-                rpsChart.data.labels = rpsHistory.map((_, i) => i);
+                // Update RPS chart
+                rpsChart.data.labels = timeLabels;
                 rpsChart.data.datasets[0].data = rpsHistory;
-                rpsChart.update();
+                rpsChart.update('none');
 
+                // Update protocol chart
                 const protocols = stats.protocols || {};
                 protocolChart.data.datasets[0].data = [
                     protocols.TCP || 0,
@@ -394,29 +447,43 @@
                     protocols.ICMP || 0,
                     protocols.OTHER || 0
                 ];
-                protocolChart.update();
+                protocolChart.update('none');
 
+                // Update top IPs chart
                 const topIPs = stats.top_ips || [];
-                topIPsChart.data.labels = topIPs.map(([ip, _]) => ip.substring(0, 12) + '...');
-                topIPsChart.data.datasets[0].data = topIPs.map(([_, count]) => count);
-                topIPsChart.update();
+                topIPsChart.data.labels = topIPs.slice(0, 10).map(([ip, _]) => ip.substring(0, 12) + '...');
+                topIPsChart.data.datasets[0].data = topIPs.slice(0, 10).map(([_, count]) => count);
+                topIPsChart.update('none');
 
+                // Update top ports chart
                 const topPorts = stats.top_ports || [];
-                topPortsChart.data.labels = topPorts.map(([port, _]) => port);
-                topPortsChart.data.datasets[0].data = topPorts.map(([_, count]) => count);
-                topPortsChart.update();
+                topPortsChart.data.labels = topPorts.slice(0, 10).map(([port, _]) => port);
+                topPortsChart.data.datasets[0].data = topPorts.slice(0, 10).map(([_, count]) => count);
+                topPortsChart.update('none');
 
+                // Update alerts
                 const alertsRes = await fetch('/api/alerts');
                 const alertsData = await alertsRes.json();
                 updateAlertsTable(alertsData.alerts);
 
+                // Update metrics
+                const metricsRes = await fetch('/api/metrics');
+                const metricsData = await metricsRes.json();
+                if (metricsData.metrics) {
+                    document.getElementById('totalBlocked').textContent = metricsData.metrics.total_blocked;
+                    updateMetricsTable(metricsData.metrics);
+                }
+
+                // Update blocked IPs
+                const blockedRes = await fetch('/api/blocked-ips');
+                const blockedData = await blockedRes.json();
+                document.getElementById('blockedIPs').textContent = blockedData.blocked_ips.length;
+
+                // Update system status
                 const statusRes = await fetch('/api/system-status');
                 const statusData = await statusRes.json();
                 updateStatus(statusData);
 
-                const blockedRes = await fetch('/api/blocked-ips');
-                const blockedData = await blockedRes.json();
-                document.getElementById('blockedIPs').textContent = blockedData.blocked_ips.length;
             } catch (error) {
                 console.error('Error updating dashboard:', error);
             }
@@ -424,7 +491,7 @@
 
         function updateAlertsTable(alerts) {
             const tbody = document.getElementById('alertsTable');
-            if (alerts.length === 0) {
+            if (!alerts || alerts.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No alerts yet.</td></tr>';
                 return;
             }
@@ -435,6 +502,26 @@
                     <td>${alert.type}</td>
                     <td class="severity-${alert.severity.toLowerCase()}">${alert.severity}</td>
                     <td>${alert.message}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updateMetricsTable(metrics) {
+            const tbody = document.getElementById('metricsTable');
+            if (!metrics) {
+                tbody.innerHTML = '<tr><td colspan="2" class="empty-state">No metrics yet.</td></tr>';
+                return;
+            }
+
+            const rows = [
+                ['Total Blocked', metrics.total_blocked || 0],
+                ['Blocked Today', metrics.blocked_today || 0],
+            ];
+
+            tbody.innerHTML = rows.map(([label, value]) => `
+                <tr>
+                    <td>${label}</td>
+                    <td><strong>${value}</strong></td>
                 </tr>
             `).join('');
         }
@@ -450,6 +537,7 @@
         }
 
         window.addEventListener('load', () => {
+            console.log('Page loaded, initializing...');
             initCharts();
             updateDashboard();
             setInterval(updateDashboard, 5000);

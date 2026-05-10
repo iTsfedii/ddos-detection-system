@@ -7,10 +7,18 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sprint1_folder = os.path.join(project_root, 'sprint1')
 sys.path.insert(0, sprint1_folder)
 
+# Import Sprint 3 modules
+sprint3_path = os.path.join(project_root, 'sprint3')
+sys.path.insert(0, sprint3_path)
+from blocker import IPBlocker
+from response_manager import ResponseManager
+from metrics import BlockingMetrics
+
 # Now import from sprint1
 from sniffer import NetworkSniffer
 from detector import AnomalyDetector
 from alerter import AlertSystem
+
 import threading
 import time
 
@@ -20,6 +28,9 @@ app = Flask(__name__, template_folder='templates')
 sniffer = None
 detector = None
 alerter = None
+blocker = None
+response_manager = None
+metrics = None
 blocked_ips = []
 
 # ============= ROUTES =============
@@ -54,7 +65,24 @@ def get_alerts():
 @app.route('/api/blocked-ips', methods=['GET'])
 def get_blocked_ips():
     """Get list of blocked IPs"""
-    return jsonify({'blocked_ips': blocked_ips})
+    if not blocker:
+        return jsonify({'blocked_ips': []})
+    return jsonify({'blocked_ips': blocker.get_blocked_ips()})
+
+@app.route('/api/metrics', methods=['GET'])
+def get_metrics():
+    """Get blocking metrics"""
+    if not metrics:
+        return jsonify({'metrics': {}})
+    return jsonify({'metrics': metrics.get_metrics()})
+
+@app.route('/api/responses', methods=['GET'])
+def get_responses():
+    """Get response history"""
+    if not response_manager:
+        return jsonify({'responses': []})
+    responses = response_manager.get_responses(limit=50)
+    return jsonify({'responses': responses})
 
 @app.route('/api/system-status', methods=['GET'])
 def get_system_status():
@@ -67,9 +95,11 @@ def get_system_status():
     elif any(a['severity'] == 'HIGH' for a in alerts[-5:]):
         status = 'WARNING'
     
+    blocked_count = blocker.get_blocked_ips() if blocker else []
+    
     return jsonify({
         'status': status,
-        'blocked_ips_count': len(blocked_ips),
+        'blocked_ips_count': len(blocked_count),
         'recent_alerts_count': len(alerts)
     })
 
@@ -87,9 +117,21 @@ def monitoring_loop():
             # Detect anomalies
             alerts = detector.detect_anomalies(stats)
             
-            # Send alerts
+            # Send alerts and take response actions
             for alert in alerts:
                 alerter.send_alert(alert)
+                
+                # Handle response (Sprint 3)
+                response = response_manager.handle_alert(alert)
+                
+                # Record metrics
+                if response['ips_blocked']:
+                    for ip in response['ips_blocked']:
+                        metrics.record_block(
+                            alert['type'],
+                            alert['severity'],
+                            ip
+                        )
             
             # Wait before next check
             time.sleep(10)
@@ -99,7 +141,7 @@ def monitoring_loop():
 
 def start_modules():
     """Initialize all modules"""
-    global sniffer, detector, alerter
+    global sniffer, detector, alerter, blocker, response_manager, metrics
     
     print("[INIT] Initializing modules...")
     
@@ -112,6 +154,11 @@ def start_modules():
     detector = AnomalyDetector()
     alerter = AlertSystem()
     
+    # Start Sprint 3 modules
+    blocker = IPBlocker()
+    response_manager = ResponseManager(blocker)
+    metrics = BlockingMetrics()
+    
     # Start monitoring thread
     monitor_thread = threading.Thread(target=monitoring_loop, daemon=True)
     monitor_thread.start()
@@ -122,7 +169,7 @@ def start_modules():
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("DDoS Detection System - Sprint 2 Dashboard")
+    print("DDoS Detection System - Sprint 3 Dashboard")
     print("=" * 60)
     print("\n[INFO] This requires Administrator privileges!")
     print("[INFO] On Windows: Right-click CMD → Run as Administrator\n")
