@@ -1,0 +1,9 @@
+{"type": "SINGLE_IP_FLOODING", "severity": "CRITICAL", "ip": "192.168.1.100", "message": "Single IP flooding detected: 3861 packets"}
+{"type": "RPS_ANOMALY", "severity": "CRITICAL", "message": "High RPS detected: 5000 req/s (normal: 15 req/s)"}
+{"type": "PORT_SCANNING", "severity": "HIGH", "ip": "10.0.0.50", "message": "Port scanning detected: 282 unique ports"}
+{"type": "SINGLE_IP_FLOODING", "severity": "CRITICAL", "ip": "192.168.1.100", "message": "Single IP flooding detected: 3861 packets"}
+{"type": "RPS_ANOMALY", "severity": "CRITICAL", "message": "High RPS detected: 5000 req/s (normal: 15 req/s)"}
+{"type": "PORT_SCANNING", "severity": "HIGH", "ip": "10.0.0.50", "message": "Port scanning detected: 282 unique ports"}
+{"type": "SINGLE_IP_FLOODING", "severity": "CRITICAL", "ip": "192.168.1.100", "message": "Single IP flooding detected: 3861 packets", "timestamp": "22:07:19"}
+{"type": "RPS_ANOMALY", "severity": "CRITICAL", "message": "High RPS detected: 5000 req/s (normal: 15 req/s)", "timestamp": "22:07:24"}
+{"type": "PORT_SCANNING", "severity": "HIGH", "ip": "10.0.0.50", "message": "Port scanning detected: 282 unique ports", "timestamp": "22:07:29"}
